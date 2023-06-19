@@ -1,20 +1,23 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+
 
 const userSchema = mongoose.Schema({
-   name:{
+   name: {
       type: String,
       maxlength: 50
    },
-   email:{
+   email: {
       type: String,
       trim: true,
       unique: 1
    },
-   password:{
+   password: {
       type: String,
       maxlength: 50
    },
-   role:{
+   role: {
       type: Number,
       default: 0
    },
@@ -26,6 +29,52 @@ const userSchema = mongoose.Schema({
       type: Number
    }
 });
+
+userSchema.pre('save', function (next) {
+   var user = this
+
+   if (user.isModified('password')) {
+      bcrypt.genSalt(saltRounds, function (err, salt) {
+         if (err) return next(err)
+         bcrypt.hash(user.password, salt, function (err, hash) {
+            if (err) return next(err)
+            user.password = hash
+            next()
+         })
+      })
+   } else {
+      next()
+   }
+})
+
+userSchema.methods.comparePassword = function (plainPassword) {
+   const user = this
+   return new Promise((resolve, reject) => {
+      bcrypt.compare(plainPassword, user.password) // DB의 암호화된 pw와 비교
+         .then(isMatch => resolve(isMatch))
+         .catch(err => reject(err))
+   })
+}
+
+userSchema.methods.generateToken = function () {
+   const user = this
+   const token = jwt.sign(user._id.toHexString(), 'secretToken')
+   user.token = token
+   return user.save().then(savedUser => savedUser)
+}
+
+userSchema.statics.findByToken = function (token) {
+   const User = this
+   let decoded
+
+   try {
+      decoded = jwt.verify(token, 'secretToken')
+   } catch (err) {
+      return Promise.reject(err)
+   }
+
+   return User.findOne({ _id: decoded, token })
+}
 
 const User = mongoose.model('User', userSchema);
 
