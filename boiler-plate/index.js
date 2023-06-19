@@ -2,8 +2,10 @@ const express = require('express');
 const app = express();
 const port = 3000;
 const bodyParser = require("body-parser");
-const { User } = require("./models/user");
+const cookieParser = require("cookie-parser");
 
+const { User } = require("./models/user");
+const { auth } = require('./middleware/auth')
 const config = require('./config/key');
 
 //application/x-www-form-urlencoded
@@ -41,7 +43,7 @@ app.post('/register', async (req, res) => {
       })
 })
 
-app.post('/login', async (req, res) => {
+app.post('/api/users/login', async (req, res) => {
 
    try {
       // 요청된 이메일 DB에 있는지 확인
@@ -60,6 +62,7 @@ app.post('/login', async (req, res) => {
 
       // 비밀번호까지 맞으면 토큰 생성
       const token = user.generateToken();
+      // 쿠키에 토큰 저장
       res.cookie("x_auth", user.token)
          .status(200)
          .json({ loginSuccess: true, userId: user._id })
@@ -68,8 +71,8 @@ app.post('/login', async (req, res) => {
    }
 })
 
-app.get('/users/auth', auth, (req, res) => {
-
+app.get('/api/users/auth', auth, (req, res) => {
+   // middleware 통과했으면 authentication은 true
    res.status(200).json({
       _id: req.user._id,
       isAdmin: req.user.role === 0 ? false : true,
